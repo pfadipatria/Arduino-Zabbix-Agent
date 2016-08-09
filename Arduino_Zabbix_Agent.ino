@@ -9,7 +9,7 @@
 
 #include <SPI.h>
 #include <Ethernet.h>
-#include <dht.h>
+#include <DHT.h>
 #include <OneWire.h>
 #include <string.h>
 
@@ -31,7 +31,7 @@ IPAddress subnet(255, 255, 255, 0);
 EthernetServer server(10050);
 EthernetClient client;
 OneWire ds(ONE_WIRE_PIN);
-dht DHT;
+DHT dht(DHT11_PIN, DHT11);
 
 boolean connected = false;
 byte i;
@@ -127,22 +127,8 @@ void readOneWire() {
 // Read DHT11 every 15 seconds and save values on variables
 void readDHT11() {
  if (millis() - dhtLastCheck > waitTime) {
-    chk = DHT.read11(DHT11_PIN);
-    switch (chk) {
-      case DHTLIB_OK:
-        break;
-      case DHTLIB_ERROR_CHECKSUM:
-        Serial.print("Checksum error,\t");
-        break;
-      case DHTLIB_ERROR_TIMEOUT:
-        Serial.print("Time out error,\t");
-        break;
-      default:
-        Serial.print("Unknown error,\t");
-        break;
-    }
-    temp = DHT.temperature;
-    umid = DHT.humidity;
+    temp = dht.readTemperature();
+    umid = dht.readHumidity();
     dhtLastCheck = millis();
   }
 }
@@ -280,6 +266,7 @@ void setup() {
   Serial.begin(9600);
   //Serial.begin(115200);
   pinMode(SOIL_PIN, INPUT);
+  dht.begin();
   Ethernet.begin(mac, ip, gateway, subnet);
   server.begin();
   Serial.println("Setup");
