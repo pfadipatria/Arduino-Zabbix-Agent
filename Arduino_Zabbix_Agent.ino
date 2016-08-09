@@ -17,9 +17,9 @@
 //----------------------------- Network settings -------------------------------
 byte mac[] = { 0x90, 0xA2, 0xDA, 0x00, 0xE3, 0x1B };
 //IPAddress ip(10, 1, 2, 235);
-IPAddress ip(10, 1, 2, 61);
-IPAddress gateway(10, 1, 2, 254);
-IPAddress subnet(255, 255, 255, 0);
+IPAddress ip(10, 89, 2, 223);
+IPAddress gateway(10, 89, 2, 1);
+IPAddress subnet(255, 255, 254, 0);
 
 //------------ Pins 10, 11, 12 e 13 are used by ethernet shield! ---------------
 #define MAX_CMD_LENGTH 25
