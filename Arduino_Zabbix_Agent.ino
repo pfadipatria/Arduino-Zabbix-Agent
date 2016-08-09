@@ -11,6 +11,7 @@
 #include <Ethernet.h>
 #include <DHT.h>
 #include <OneWire.h>
+#include <DallasTemperature.h>
 #include <string.h>
 
 //----------------------------- Network settings -------------------------------
@@ -30,7 +31,9 @@ IPAddress subnet(255, 255, 255, 0);
 
 EthernetServer server(10050);
 EthernetClient client;
-OneWire ds(ONE_WIRE_PIN);
+OneWire oneWire(ONE_WIRE_PIN);
+DallasTemperature ds(&oneWire);
+DeviceAddress dsTemp;
 DHT dht(DHT11_PIN, DHT11);
 
 boolean connected = false;
@@ -42,9 +45,7 @@ byte addr[8];
 double temp = 0;                // Temperature
 double umid = 0;                // Humidity
 float celsius;
-float oneWire17 = 0;
-float oneWireB6 = 0;
-float oneWireD3 = 0;
+float oneWireTemp = 0;
 String cmd;                     //FOR ZABBIX COMMAND
 String serialNum;
 int counter = 1;                // For testing
@@ -62,64 +63,11 @@ unsigned long oneWireLastCheck = 0;
 // Read all DS18b20 and saves the result on variables every 15 seconds.
 void readOneWire() {
   if (millis() - oneWireLastCheck > waitTime) {
-    if ( !ds.search(addr)) {
-      //Serial.println("No more addresses.");
-      ds.reset_search();
-      //delay(250);
-      return;
-    }
-    if (OneWire::crc8(addr, 7) != addr[7]) {
-      Serial.println("CRC is not valid!");
-      return;
-    }
-    switch (addr[0]) {
-      case 0x10:
-        type_s = 1;
-        break;
-      case 0x28:
-        type_s = 0;
-        break;
-      case 0x22:
-        type_s = 0;
-        break;
-      default:
-        Serial.println("Device is not a DS18x20 family device.");
-        return;
-    }
-    ds.reset();
-    ds.select(addr);
-    ds.write(0x44, 1);      // start conversion, with parasite power on at the end
-    //delay(1000);          // maybe 750ms is enough, maybe not
-    // we might do a ds.depower() here, but the reset will take care of it.
-    present = ds.reset();
-    ds.select(addr);
-    ds.write(0xBE);         // Read Scratchpad
-    for ( i = 0; i < 9; i++) {           // we need 9 bytes
-      data[i] = ds.read();
-    }
-    int16_t raw = (data[1] << 8) | data[0];
-    if (type_s) {
-      raw = raw << 3; // 9 bit resolution default
-      if (data[7] == 0x10) {
+    Serial.println("Reading OneWire");
 
-        raw = (raw & 0xFFF0) + 12 - data[6];
-      }
-    } else {
-      byte cfg = (data[4] & 0x60);
-
-      if (cfg == 0x00) raw = raw & ~7;      // 9 bit resolution, 93.75 ms
-      else if (cfg == 0x20) raw = raw & ~3; // 10 bit res, 187.5 ms
-      else if (cfg == 0x40) raw = raw & ~1; // 11 bit res, 375 ms
-    }
-    celsius = (float)raw / 16.0;
-    //Serial.print(celsius);
-    //Serial.println(" Celsius");
-    serialNum = String(addr[7], HEX);
-    if (serialNum == "17") oneWire17 = celsius;
-    else if (serialNum == "b6") oneWireB6 = celsius;
-    else if (serialNum == "d3") oneWireD3 = celsius;
-    // If Fahrenheit needed, (Fahrenheit = Celsius * 1.8) + 32;
-
+    ds.requestTemperatures();
+    oneWireTemp = ds.getTempC(dsTemp);
+    
     oneWireLastCheck = millis();
   }
 }
@@ -206,16 +154,8 @@ void parseCommand() {
       server.println(umid);
       Serial.print(umid);
     } else if (cmd.equals("r")) {
-      server.println(oneWire17);
-      Serial.print(oneWire17);
-    } else if (cmd.equals("f")) {
-      server.println(oneWireB6);
-      Serial.print(oneWireB6);
-      oneWireLastCheck = oneWireLastCheck - (waitTime/3);
-    } else if (cmd.equals("v")) {
-      server.println(oneWireD3);
-      Serial.print(oneWireD3);
-      oneWireLastCheck = oneWireLastCheck - (waitTime/3);
+      server.println(oneWireTemp);
+      Serial.print(oneWireTemp);
     } else if (cmd.equals("t")) {
       server.println(presence);
       Serial.print(presence);
@@ -269,6 +209,12 @@ void setup() {
   dht.begin();
   Ethernet.begin(mac, ip, gateway, subnet);
   server.begin();
+  ds.begin();
+  if (!ds.getAddress(dsTemp, 0)) {
+    Serial.println("Unable to find address for Device 0");
+    return;
+  }
+  ds.setResolution(dsTemp, 12);
   Serial.println("Setup");
   delay(1000);
 }
